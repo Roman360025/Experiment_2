@@ -1,0 +1,80 @@
+main(): This is RIOT! (Version: 2019.01.UNWDS)
+SX1276/77/78/79 transceiver detected
+[LoRa] reconfigure transceiver
+
+Send: 1
+[LoRa] transmission done.
+Send: 1
+[LoRa] transmission done.
+Send: 1
+[LoRa] transmission done.
+RX: 10 bytes, | RSSend: 1
+Send: 1
+Send: 1
+[LoRa] transmission done.
+[LoRa] transmission done.
+bytes, | RSSend: 1
+Send: 1
+[LoRa] 
+transmissionSend: 1
+ done.
+ransmission done.
+end: 1
+ransmission es, | RSSI:ransmission Send: 1
+S[LoRa] tr[LoRa] trRX: 10 SI: -91 dBm nd: 1
+one.
+Seansmission done.
+[LoRa] traSenne.
+Senne.
+Senne.
+
+d: 1
+smission done.
+: 1
+
+: 1
+mission don: 1
+mission don 1
+LoRa] transmission doneRX: 10 SI: -91 dBm Send:.
+Send:LoRa] transm1
+.
+ission done.RX: 10 bytes, | RSSI: -89 dBm | SNR: 6 dB
+Send: 1
+[LoRa] transmission done.
+
+PowerSend: 
+
+
+Send: 1[Lo[LoRa] transmisbytes, | RSSI: -89 dBm [LoRa] transmis[LoRsion done.
+I: -89 dBm ion done.
+[LoRion done.
+Send: 1
+RX: 10 ] transmissi[LoRaon done.
+Send: 1
+Send: 1
+Send: 1
+bytes, | RSS transmission done.
+ transmissio[LoRa] transmission done.
+bytes, | RSS[LoRa] Send: 1
+[LoRa] [LoRa]  done.
+[LoRa] transmissionI: -89 dBm Send: 1
+ransmission done.
+end: 1
+[LoRa] t done.
+end: 1
+Sdone.
+ansmission dbytes, | RSSone.
+nd: 1
+[LoRa] transmission done.
+[LoRa] traRX: 10 bytes, | RSS| SNR: 6 dB
+one.
+ne.
+nsmission done.
+Sensmission doytes, | RSSI: -88 dBm |Send: 1
+smission done.
+e.
+smission donSend: 1
+Send[LoRa] trans.
+RX: 10 b 1
+.
+.
