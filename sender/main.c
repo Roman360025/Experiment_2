@@ -23,6 +23,8 @@
 #define SX127X_LORA_MSG_QUEUE   (16U)
 #define SX127X_STACKSIZE        (2*THREAD_STACKSIZE_DEFAULT)
 
+int power = -1;
+int sf = 7;
 
 volatile int fcnt = 0;
 volatile int slotcnt = 0;
@@ -214,12 +216,6 @@ void do_send(vemac_t *vemac, int *power, int *sf)
     }
     else
     {
-//        printf("Send: %d\n", (* count));
-
-        // for (int i = 0; i < 10; ++i)
-        // {
-        //     printf("%i ", buffer[i]);
-        // }
     }
 }
 
@@ -227,15 +223,10 @@ void do_send(vemac_t *vemac, int *power, int *sf)
 void *slot_thread(void *arg){
        vemac_t *vemac = (vemac_t *)arg;
 
-        int power = 13;
-        int sf = 12;
-
     while (1) {
-//        int count = 0;
 
         vemac->device->driver->set(vemac->device, NETOPT_TX_POWER, &power, sizeof(int16_t));
 
-        // puts("Starting to send messages");
 
 
         for (int i = 0; i < 10; ++i)
@@ -349,8 +340,8 @@ int vemac_init(vemac_t *vemac, netdev_t *device){
     uint16_t modem = NETDEV_TYPE_LORA;
     vemac->device->driver->set(vemac->device, NETOPT_DEVICE_TYPE, &modem, sizeof(uint16_t));
 
-    uint8_t sf = LORA_SF7;
-    vemac->device->driver->set(vemac->device, NETOPT_SPREADING_FACTOR, &sf, sizeof(uint8_t));
+    uint8_t sf_init = LORA_SF7;
+    vemac->device->driver->set(vemac->device, NETOPT_SPREADING_FACTOR, &sf_init, sizeof(uint8_t));
     uint8_t bw = LORA_BW_125_KHZ;
     vemac->device->driver->set(vemac->device, NETOPT_BANDWIDTH, &bw, sizeof(uint8_t));
     uint8_t cr = LORA_CR_4_5;
@@ -364,8 +355,8 @@ int vemac_init(vemac_t *vemac, netdev_t *device){
     vemac->device->driver->set(vemac->device, NETOPT_FIXED_HEADER, &disable, sizeof(disable));
     vemac->device->driver->set(vemac->device, NETOPT_IQ_INVERT, &disable, sizeof(disable));
     
-    int16_t power = -1;
-    vemac->device->driver->set(vemac->device, NETOPT_TX_POWER, &power, sizeof(int16_t));
+    int16_t power_init = -1;
+    vemac->device->driver->set(vemac->device, NETOPT_TX_POWER, &power_init, sizeof(int16_t));
     
     uint16_t preamble_len = 8;
     vemac->device->driver->set(vemac->device, NETOPT_PREAMBLE_LENGTH, &preamble_len, sizeof(uint16_t));
@@ -391,6 +382,46 @@ vemac_t vemac;
 int main(void){
     sx127x.params = sx127x_params;
     vemac_init(&vemac, (netdev_t*) &sx127x);
+
+    while (1)
+    {
+        scanf("%d", &power);
+        scanf("%d", &sf);
+
+        puts("");
+        printf("Power: %d\n", power);
+        puts("");
+
+        vemac.device->driver->set(vemac.device, NETOPT_TX_POWER, &power, sizeof(int16_t));
+
+        puts("");
+        printf("SF: %d\n", sf);
+        puts("");
+
+        switch (sf)
+            {
+            case 7:
+                sf = LORA_SF7;
+                break;
+            case 8:
+                sf = LORA_SF8;
+                break;
+            case 9:
+                sf = LORA_SF9;
+                break;
+            case 10:
+                sf = LORA_SF10;
+                break;
+            case 11:
+                sf = LORA_SF11;
+                break;
+            case 12:
+                sf = LORA_SF12;
+                break;
+            }
+
+        vemac.device->driver->set(vemac.device, NETOPT_SPREADING_FACTOR, &sf, sizeof(uint8_t));
+    }
     
     }
  
