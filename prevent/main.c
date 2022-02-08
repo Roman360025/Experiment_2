@@ -215,31 +215,24 @@ void do_send(vemac_t *vemac, int *count)
     {
         printf("Send: %d\r\n", (* count));
 
-        // for (int i = 0; i < 10; ++i)
-        // {
-        //     printf("%i ", buffer[i]);
-        // }
     }
 }
 
+void pps_handler(void *arg){
+    vemac_t *vemac = (vemac_t *)arg;
+    int count = 0;
 
-void *slot_thread(void *arg){
-       vemac_t *vemac = (vemac_t *)arg;
-
-
-    while (1) {
-        int count = 0;
-
-        // puts("Starting to send messages");
-
-
-        count++;
-        lptimer_sleep(1000);
-        do_send(vemac, &count);
-    }
+    gpio_clear(LED0_PIN);
+    lptimer_sleep(90);
+    gpio_toggle(LED0_PIN);
+    count++;
+    do_send(vemac, &count);
 }
 
-int vemac_init(vemac_t *vemac, netdev_t *device){
+
+//Мощность отличается на 6 если одинаковый SF
+
+int vemac_init(vemac_t *vemac, netdev_t *device, gpio_t pps_pin){
     device->driver = &sx127x_driver;
     vemac->device = device;
 
@@ -251,10 +244,6 @@ int vemac_init(vemac_t *vemac, netdev_t *device){
         puts("ls_init: creation of SX127X ISR thread failed");
         return false;
     }
-
-    vemac->slot_pid = thread_create(vemac->slot_stack, sizeof(vemac->slot_stack), THREAD_PRIORITY_MAIN - 2,
-                              THREAD_CREATE_STACKTEST, slot_thread, vemac,
-                              "VeMAC uplink thread");
 
     if (vemac->isr_pid <= KERNEL_PID_UNDEF) {
         puts("ls_init: creation of SX127X ISR thread failed");
@@ -313,6 +302,8 @@ int vemac_init(vemac_t *vemac, netdev_t *device){
     state = NETOPT_STATE_IDLE;
     vemac->device->driver->set(vemac->device, NETOPT_STATE, &state, sizeof(uint8_t));
 
+    gpio_init_int(pps_pin, GPIO_IN_PU, GPIO_RISING, pps_handler, (void*) vemac);
+
 
     return 0;
 }
@@ -321,7 +312,8 @@ vemac_t vemac;
 
 int main(void){
     sx127x.params = sx127x_params;
-    vemac_init(&vemac, (netdev_t*) &sx127x);
+    vemac_init(&vemac, (netdev_t*) &sx127x, UNWD_GPIO_1);
+    gpio_clear(LED0_PIN);
 
 
 

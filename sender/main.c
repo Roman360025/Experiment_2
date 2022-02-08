@@ -232,6 +232,13 @@ void *slot_thread(void *arg){
         for (int i = 0; i < 10; ++i)
         {
             lptimer_sleep(5000);
+            gpio_set(UNWD_GPIO_1);
+            gpio_set(LED0_PIN);
+            lptimer_sleep(10);
+            gpio_clear(UNWD_GPIO_1);
+            gpio_clear(LED0_PIN);
+            lptimer_sleep(90);
+            gpio_toggle(LED0_PIN);
             do_send(vemac, &power, &sf);
         }
 
@@ -382,6 +389,10 @@ vemac_t vemac;
 int main(void){
     sx127x.params = sx127x_params;
     vemac_init(&vemac, (netdev_t*) &sx127x);
+
+    gpio_init(UNWD_GPIO_1, GPIO_OUT);
+    gpio_clear(UNWD_GPIO_1);
+    gpio_clear(LED0_PIN);
 
     while (1)
     {
