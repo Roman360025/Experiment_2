@@ -32,6 +32,13 @@ int power = -1;
 int sf = 7;
 int sf_old = 7;
 
+int8_t buffer[10] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
+
+iolist_t data = {
+    .iol_base = buffer,
+    .iol_len = 10,
+    };
+
 typedef struct {
     bool (*appdata_received_cb)(uint8_t *buf, size_t buflen);
 
@@ -144,7 +151,7 @@ static void sx127x_handler(netdev_t *dev, netdev_event_t event, void *arg)
             }
             
             vemac->device->driver->recv(dev, message, len, &packet_info);
-            printf("RX: %d bytes, | RSSI: %d dBm | SNR: %d dB\n", (int)len, packet_info.rssi, (int)packet_info.snr);
+//            printf("RX: %d bytes, | RSSI: %d dBm | SNR: %d dB\n", (int)len, packet_info.rssi, (int)packet_info.snr);
             /* TODO: здесь вызываем обработчик пакета (точнее, кидаем сообщение в другой поток?) */
             break;
         }
@@ -192,41 +199,48 @@ static void sx127x_handler(netdev_t *dev, netdev_event_t event, void *arg)
 
 
 
-void do_send(vemac_t *vemac, int *count)
-{
-    int8_t buffer[10];
+//void do_send(vemac_t *vemac)
+//{
+//    int8_t buffer[10];
+//
+//    for (int i = 1; i < 10; ++i)
+//    {
+//        buffer[i] = i;
+//    }
+//
+//
+//
+//    iolist_t data = {
+//    .iol_base = buffer,
+//    .iol_len = 10,
+//    };
+//
+//
+//    if (vemac->device->driver->send(vemac->device, &data) < 0) {
+//        puts("[LoRa] cannot send, device busy");
+//    }
+//    else
+//    {
+//        gpio_clear(LED0_PIN);
+//        lptimer_sleep(90);
+//        gpio_toggle(LED0_PIN);
+//    }
+//}
 
-    for (int i = 1; i < 10; ++i)
-    {
-        buffer[i] = i;
-    }
+void pps_handler(void *arg){
+    vemac_t *vemac = (vemac_t *)arg;
+//
+//    do_send(vemac);
 
-
-
-    iolist_t data = {
-    .iol_base = buffer,
-    .iol_len = 10,
-    };
-            
     if (vemac->device->driver->send(vemac->device, &data) < 0) {
         puts("[LoRa] cannot send, device busy");
     }
     else
     {
-        printf("Send: %d\r\n", (* count));
-
+        gpio_clear(LED0_PIN);
+        lptimer_sleep(90);
+        gpio_toggle(LED0_PIN);
     }
-}
-
-void pps_handler(void *arg){
-    vemac_t *vemac = (vemac_t *)arg;
-    int count = 0;
-
-    gpio_clear(LED0_PIN);
-    lptimer_sleep(90);
-    gpio_toggle(LED0_PIN);
-    count++;
-    do_send(vemac, &count);
 }
 
 
