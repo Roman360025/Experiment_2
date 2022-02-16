@@ -24,8 +24,6 @@
 #define SX127X_STACKSIZE        (2*THREAD_STACKSIZE_DEFAULT)
 
 
-volatile int fcnt = 0;
-volatile int slotcnt = 0;
 
 bool flag_power = false;
 int power = -1;
@@ -44,29 +42,19 @@ typedef struct {
 
     netdev_t *device;       /**< Pointer to the radio PHY structure */
     gpio_t pps_pin;
-    
+
     char isr_stack[SX127X_STACKSIZE];
     kernel_pid_t isr_pid;
-    
+
     char slot_stack[SX127X_STACKSIZE];
     kernel_pid_t slot_pid;
-    
-    int fcnt;
-    int scnt;
-    int time_slot;
-    
+
+
     lptimer_t slot_timer;
-    /* TODO: add VeMAC control structures (received IDs, own ID, etc...) */
-    bool m_slots_received[10];
-    bool slot_free;
+    /* TODO: add prevent control structures (received IDs, own ID, etc...) */
 
-    int slots[10];
-    int slot_listened_for_initial_assign;
-    int slot_listened_for_check;
 
-    int id;
-
-} vemac_t;
+} prevent_t;
 
 
 #define MSG_TYPE_ISR            (0x3456)
@@ -82,25 +70,17 @@ static sx127x_params_t sx127x_params = {
     .dio4_pin = SX127X_DIO4,
     .dio5_pin = SX127X_DIO5,
     .reset_pin = SX127X_RESET,
-   
+
     .rfswitch_pin = SX127X_RFSWITCH,
     .rfswitch_active_level = 1,
     .paselect = SX127X_PARAM_PASELECT
 };
 static sx127x_t sx127x;
 
-int get_random_number(void) {
-/* return a random number between 0 and limit inclusive.
- */
-
-    srand(time(NULL));
-
-    return rand() % 10;
-}
 
 void *isr_thread(void *arg){
     (void)arg;
-    
+
     static msg_t _msg_q[SX127X_LORA_MSG_QUEUE];
     msg_init_queue(_msg_q, SX127X_LORA_MSG_QUEUE);
 
@@ -121,36 +101,36 @@ void *isr_thread(void *arg){
 
 static void sx127x_handler(netdev_t *dev, netdev_event_t event, void *arg)
 {
-    vemac_t *vemac = (vemac_t *)arg;
-    
+    prevent_t *prevent = (prevent_t *)arg;
+
     if (event == NETDEV_EVENT_ISR) {
         msg_t msg;
         msg.type = MSG_TYPE_ISR;
         msg.content.ptr = dev;
-        if (msg_send(&msg, vemac->isr_pid) <= 0) {
+        if (msg_send(&msg, prevent->isr_pid) <= 0) {
             puts("gnrc_netdev: possibly lost interrupt.");
         }
         return;
     }
-    
+
     switch (event) {
         case NETDEV_EVENT_RX_COMPLETE: {
             int len;
             netdev_lora_rx_info_t packet_info;
             int8_t message[255];
-    
-            len = vemac->device->driver->recv(dev, NULL, 0, &packet_info);
+
+            len = prevent->device->driver->recv(dev, NULL, 0, &packet_info);
             if (len < 0) {
                 printf("RX: bad message, aborting\r\n");
                 break;
             }
             else {
-                vemac->device->driver->recv(dev, message, len, &packet_info);
+                prevent->device->driver->recv(dev, message, len, &packet_info);
 
 
             }
-            
-            vemac->device->driver->recv(dev, message, len, &packet_info);
+
+            prevent->device->driver->recv(dev, message, len, &packet_info);
 //            printf("RX: %d bytes, | RSSI: %d dBm | SNR: %d dB\n", (int)len, packet_info.rssi, (int)packet_info.snr);
             /* TODO: здесь вызываем обработчик пакета (точнее, кидаем сообщение в другой поток?) */
             break;
@@ -161,11 +141,11 @@ static void sx127x_handler(netdev_t *dev, netdev_event_t event, void *arg)
 
         case NETDEV_EVENT_TX_COMPLETE:
             printf("[LoRa] transmission done.\r\n");
-            
+
             /* TODO: переключаемся в режим приема правильно */
             uint8_t state = NETOPT_STATE_IDLE;
-            vemac->device->driver->set(dev, NETOPT_STATE, &state, sizeof(uint8_t));
-            
+            prevent->device->driver->set(dev, NETOPT_STATE, &state, sizeof(uint8_t));
+
             break;
 
         case NETDEV_EVENT_RX_TIMEOUT:
@@ -175,17 +155,17 @@ static void sx127x_handler(netdev_t *dev, netdev_event_t event, void *arg)
         case NETDEV_EVENT_TX_TIMEOUT:
             /* this should not happen, re-init SX127X here */
             puts("[LoRa] TX timeout");
-            vemac->device->driver->init(dev);
+            prevent->device->driver->init(dev);
             break;
-            
+
         case NETDEV_EVENT_CAD_DONE:
             puts("[LoRa] CAD done\n");
             break;
-            
+
         case NETDEV_EVENT_CAD_DETECTED:
             puts("[LoRa] CAD detected\n");
             break;
-            
+
         case NETDEV_EVENT_VALID_HEADER:
 //            puts("[LoRa] header received, switch to RX state");
             break;
@@ -199,7 +179,7 @@ static void sx127x_handler(netdev_t *dev, netdev_event_t event, void *arg)
 
 
 
-//void do_send(vemac_t *vemac)
+//void do_send(prevent_t *prevent)
 //{
 //    int8_t buffer[10];
 //
@@ -216,7 +196,7 @@ static void sx127x_handler(netdev_t *dev, netdev_event_t event, void *arg)
 //    };
 //
 //
-//    if (vemac->device->driver->send(vemac->device, &data) < 0) {
+//    if (prevent->device->driver->send(prevent->device, &data) < 0) {
 //        puts("[LoRa] cannot send, device busy");
 //    }
 //    else
@@ -228,11 +208,11 @@ static void sx127x_handler(netdev_t *dev, netdev_event_t event, void *arg)
 //}
 
 void pps_handler(void *arg){
-    vemac_t *vemac = (vemac_t *)arg;
+    prevent_t *prevent = (prevent_t *)arg;
 //
-//    do_send(vemac);
+//    do_send(prevent);
 
-    if (vemac->device->driver->send(vemac->device, &data) < 0) {
+    if (prevent->device->driver->send(prevent->device, &data) < 0) {
         puts("[LoRa] cannot send, device busy");
     }
     else
@@ -243,33 +223,41 @@ void pps_handler(void *arg){
     }
 }
 
+//        printf("Send: %d\r\n", (* count));
 
-//Мощность отличается на 6 если одинаковый SF
+        // for (int i = 0; i < 10; ++i)
+        // {
+        //     printf("%i ", buffer[i]);
+        // }
 
-int vemac_init(vemac_t *vemac, netdev_t *device, gpio_t pps_pin){
+
+
+
+int prevent_t_init(prevent_t *prevent, netdev_t *device, gpio_t pps_pin){
     device->driver = &sx127x_driver;
-    vemac->device = device;
+    prevent->device = device;
 
-    vemac->isr_pid = thread_create(vemac->isr_stack, sizeof(vemac->isr_stack), THREAD_PRIORITY_MAIN - 1,
-                              THREAD_CREATE_STACKTEST, isr_thread, vemac,
+    prevent->isr_pid = thread_create(prevent->isr_stack, sizeof(prevent->isr_stack), THREAD_PRIORITY_MAIN - 1,
+                              THREAD_CREATE_STACKTEST, isr_thread, prevent,
                               "SX127x handler thread");
 
-    if (vemac->isr_pid <= KERNEL_PID_UNDEF) {
+    if (prevent->isr_pid <= KERNEL_PID_UNDEF) {
         puts("ls_init: creation of SX127X ISR thread failed");
         return false;
     }
 
-    if (vemac->isr_pid <= KERNEL_PID_UNDEF) {
+
+    if (prevent->isr_pid <= KERNEL_PID_UNDEF) {
         puts("ls_init: creation of SX127X ISR thread failed");
         return false;
     }
 
-    if(vemac->device->driver->init(vemac->device) < 0){
+    if(prevent->device->driver->init(prevent->device) < 0){
         puts("Netdev driver initialisation failed");
     }
 
-    vemac->device->event_callback = sx127x_handler;
-    vemac->device->event_callback_arg = vemac;
+    prevent->device->event_callback = sx127x_handler;
+    prevent->device->event_callback_arg = prevent;
 
     /* Конфигурируем трансивер, выставляем значимые параметры */
     const netopt_enable_t enable = true;
@@ -278,56 +266,53 @@ int vemac_init(vemac_t *vemac, netdev_t *device, gpio_t pps_pin){
     puts("[LoRa] reconfigure transceiver\n");
     /* Configure to sleep */
     uint8_t state = NETOPT_STATE_SLEEP;
-    vemac->device->driver->set(vemac->device, NETOPT_STATE, &state, sizeof(uint8_t));
+    prevent->device->driver->set(prevent->device, NETOPT_STATE, &state, sizeof(uint8_t));
 
     uint16_t modem = NETDEV_TYPE_LORA;
-    vemac->device->driver->set(vemac->device, NETOPT_DEVICE_TYPE, &modem, sizeof(uint16_t));
+    prevent->device->driver->set(prevent->device, NETOPT_DEVICE_TYPE, &modem, sizeof(uint16_t));
 
     uint8_t sf_init = LORA_SF7;
-    vemac->device->driver->set(vemac->device, NETOPT_SPREADING_FACTOR, &sf_init, sizeof(uint8_t));
+    prevent->device->driver->set(prevent->device, NETOPT_SPREADING_FACTOR, &sf_init, sizeof(uint8_t));
     uint8_t bw = LORA_BW_125_KHZ;
-    vemac->device->driver->set(vemac->device, NETOPT_BANDWIDTH, &bw, sizeof(uint8_t));
+    prevent->device->driver->set(prevent->device, NETOPT_BANDWIDTH, &bw, sizeof(uint8_t));
     uint8_t cr = LORA_CR_4_5;
-    vemac->device->driver->set(vemac->device, NETOPT_CODING_RATE, &cr, sizeof(uint8_t));
+    prevent->device->driver->set(prevent->device, NETOPT_CODING_RATE, &cr, sizeof(uint8_t));
 
     uint8_t hop_period = 0;
-    vemac->device->driver->set(vemac->device, NETOPT_CHANNEL_HOP_PERIOD, &hop_period, sizeof(uint8_t));
-    vemac->device->driver->set(vemac->device, NETOPT_CHANNEL_HOP, &disable, sizeof(disable));
-    vemac->device->driver->set(vemac->device, NETOPT_SINGLE_RECEIVE, &disable, sizeof(disable));
-    vemac->device->driver->set(vemac->device, NETOPT_INTEGRITY_CHECK, &disable, sizeof(enable));
-    vemac->device->driver->set(vemac->device, NETOPT_FIXED_HEADER, &disable, sizeof(disable));
-    vemac->device->driver->set(vemac->device, NETOPT_IQ_INVERT, &disable, sizeof(disable));
+    prevent->device->driver->set(prevent->device, NETOPT_CHANNEL_HOP_PERIOD, &hop_period, sizeof(uint8_t));
+    prevent->device->driver->set(prevent->device, NETOPT_CHANNEL_HOP, &disable, sizeof(disable));
+    prevent->device->driver->set(prevent->device, NETOPT_SINGLE_RECEIVE, &disable, sizeof(disable));
+    prevent->device->driver->set(prevent->device, NETOPT_INTEGRITY_CHECK, &disable, sizeof(enable));
+    prevent->device->driver->set(prevent->device, NETOPT_FIXED_HEADER, &disable, sizeof(disable));
+    prevent->device->driver->set(prevent->device, NETOPT_IQ_INVERT, &disable, sizeof(disable));
 
     int16_t power_init = -1;
-    vemac->device->driver->set(vemac->device, NETOPT_TX_POWER, &power_init, sizeof(int16_t));
+    prevent->device->driver->set(prevent->device, NETOPT_TX_POWER, &power_init, sizeof(int16_t));
 
     uint16_t preamble_len = 8;
-    vemac->device->driver->set(vemac->device, NETOPT_PREAMBLE_LENGTH, &preamble_len, sizeof(uint16_t));
+    prevent->device->driver->set(prevent->device, NETOPT_PREAMBLE_LENGTH, &preamble_len, sizeof(uint16_t));
 
     uint32_t tx_timeout = 30000;
-    vemac->device->driver->set(vemac->device, NETOPT_TX_TIMEOUT, &tx_timeout, sizeof(uint32_t));
+    prevent->device->driver->set(prevent->device, NETOPT_TX_TIMEOUT, &tx_timeout, sizeof(uint32_t));
 
     uint32_t rx_timeout = 0;
-    vemac->device->driver->set(vemac->device, NETOPT_RX_TIMEOUT, &rx_timeout, sizeof(uint32_t));
+    prevent->device->driver->set(prevent->device, NETOPT_RX_TIMEOUT, &rx_timeout, sizeof(uint32_t));
 
     uint32_t frequency = 869000000;
-    vemac->device->driver->set(vemac->device, NETOPT_CHANNEL_FREQUENCY, &frequency, sizeof(uint32_t));
+    prevent->device->driver->set(prevent->device, NETOPT_CHANNEL_FREQUENCY, &frequency, sizeof(uint32_t));
 
     state = NETOPT_STATE_IDLE;
-    vemac->device->driver->set(vemac->device, NETOPT_STATE, &state, sizeof(uint8_t));
+    prevent->device->driver->set(prevent->device, NETOPT_STATE, &state, sizeof(uint8_t));
 
-    gpio_init_int(pps_pin, GPIO_IN_PU, GPIO_RISING, pps_handler, (void*) vemac);
-
-
+    gpio_init_int(pps_pin, GPIO_IN_PU, GPIO_RISING, pps_handler, (void*) prevent);
     return 0;
 }
 
-vemac_t vemac;
+prevent_t prevent;
 
 int main(void){
     sx127x.params = sx127x_params;
-    vemac_init(&vemac, (netdev_t*) &sx127x, UNWD_GPIO_1);
-    gpio_clear(LED0_PIN);
+    prevent_t_init(&prevent, (netdev_t*) &sx127x, UNWD_GPIO_1);
 
 
 
@@ -339,7 +324,7 @@ int main(void){
         puts("");
         printf("Power: %d\n", power);
         puts("");
-        vemac.device->driver->set(vemac.device, NETOPT_TX_POWER, &power, sizeof(int16_t));
+        prevent.device->driver->set(prevent.device, NETOPT_TX_POWER, &power, sizeof(int16_t));
 
         if (sf_old != sf)
         {
@@ -369,7 +354,7 @@ int main(void){
                 break;
             }
 
-            vemac.device->driver->set(vemac.device, NETOPT_SPREADING_FACTOR, &sf, sizeof(uint8_t));
+            prevent.device->driver->set(prevent.device, NETOPT_SPREADING_FACTOR, &sf, sizeof(uint8_t));
         }
     }
  }
