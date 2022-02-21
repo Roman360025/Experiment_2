@@ -194,6 +194,14 @@ void do_send(sender_t *sender, int *power, int *sf)
     .iol_len = 10,
     };
 
+    gpio_set(UNWD_GPIO_1);
+//    gpio_set(LED0_PIN);
+//    lptimer_sleep(10);
+    gpio_clear(UNWD_GPIO_1);
+//    gpio_clear(LED0_PIN);
+//    lptimer_sleep(90);
+//    gpio_toggle(LED0_PIN);
+
     if (sender->device->driver->send(sender->device, &data) < 0) {
 //        puts("[LoRa] cannot send, device busy");
     }
@@ -215,13 +223,6 @@ void *slot_thread(void *arg){
         for (int i = 0; i < 10; ++i)
         {
             lptimer_sleep(5000);
-            gpio_set(UNWD_GPIO_1);
-            gpio_set(LED0_PIN);
-            lptimer_sleep(10);
-            gpio_clear(UNWD_GPIO_1);
-            gpio_clear(LED0_PIN);
-            lptimer_sleep(90);
-            gpio_toggle(LED0_PIN);
             do_send(sender, &power, &sf);
         }
 
@@ -230,9 +231,7 @@ void *slot_thread(void *arg){
 
         if (power == 15) {
             if (sf == 12) {
-                printf("DDDne\r\n");
-                lptimer_sleep(500);
-                printf("DDDone\r\n");
+                printf("Done\r\n");
                 sf = 7;
                 }
             else {
@@ -240,9 +239,7 @@ void *slot_thread(void *arg){
             }
 
             power = -1;
-            printf("PPPower %d\r\n", power);
-            lptimer_sleep(500);
-            printf("PPPower %d\r\n", power);
+            printf("Power %d\r\n", power);
 
             power = 15;
             do_send(sender, &power, &sf);
@@ -282,9 +279,7 @@ void *slot_thread(void *arg){
 
         }
         else {
-            printf("PPPower %d\r\n", power);
-            lptimer_sleep(500);
-            printf("PPPower %d\r\n", power);
+            printf("Power %d\r\n", power);
             }
         }
     }

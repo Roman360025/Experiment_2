@@ -304,7 +304,7 @@ int prevent_t_init(prevent_t *prevent, netdev_t *device, gpio_t pps_pin){
     state = NETOPT_STATE_IDLE;
     prevent->device->driver->set(prevent->device, NETOPT_STATE, &state, sizeof(uint8_t));
 
-    gpio_init_int(pps_pin, GPIO_IN_PU, GPIO_RISING, pps_handler, (void*) prevent);
+    gpio_init_int(pps_pin, GPIO_IN_PU, GPIO_FALLING, pps_handler, (void*) prevent);
     return 0;
 }
 
